@@ -2,13 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "../../auth/[...nextauth]/route"
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3"
-
-// Check if we're in development mode
-const isDevelopment = process.env.NODE_ENV === "development"
+import { isDevelopment } from "@/lib/env"
 
 export async function GET(req: NextRequest) {
   // Skip auth in development
-  if (!isDevelopment) {
+  if (!isDevelopment()) {
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

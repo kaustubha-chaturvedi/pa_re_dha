@@ -85,11 +85,7 @@ export function VisualEditor() {
     
     setLoading(true)
     try {
-      // Use local fetch in development (when on localhost), GitHub API in production
-      const isDevelopment = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      const apiEndpoint = isDevelopment ? "/api/fetch-local" : "/api/fetch-file"
-      
-      const res = await fetch(apiEndpoint, {
+      const res = await fetch("/api/fetch-file", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -303,27 +299,16 @@ export function VisualEditor() {
     try {
       const markdown = matter.stringify(pageData.content, pageData.frontmatter)
 
-      // Use local save in development (when on localhost), GitHub commit in production
-      const isDevelopment = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      const apiEndpoint = isDevelopment ? "/api/save-local" : "/api/commit"
-      
-      const requestBody = isDevelopment 
-        ? {
-            path: currentPage.path,
-            content: markdown,
-          }
-        : {
-            path: currentPage.path,
-            content: markdown,
-            message: `Update ${currentPage.name} page via visual editor`,
-          }
-
-      const res = await fetch(apiEndpoint, {
+      const res = await fetch("/api/commit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          path: currentPage.path,
+          content: markdown,
+          message: `Update ${currentPage.name} page via visual editor`,
+        }),
       })
 
       if (!res.ok) {
@@ -334,9 +319,7 @@ export function VisualEditor() {
       const result = await res.json()
       toast({
         title: "Saved successfully",
-        description: isDevelopment 
-          ? `File saved to ${currentPage.path}. If changes don't appear: 1) Restart Astro dev server, or 2) Hard refresh browser (Ctrl+Shift+R)`
-          : "Your changes have been committed to the repository.",
+        description: "Your changes have been committed to the repository.",
         duration: 5000,
       })
 

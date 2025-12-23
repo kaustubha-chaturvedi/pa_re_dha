@@ -53,6 +53,7 @@ export function Editor({ content, onChange, placeholder = "Start writing..." }: 
       }),
     ],
     content,
+    immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML())
     },

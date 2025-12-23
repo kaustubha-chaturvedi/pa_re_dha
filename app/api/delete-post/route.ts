@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "../auth/[...nextauth]/route"
+import { requireAuth } from "@/lib/auth-service"
+import { deleteFile } from "@/lib/github-service"
 import { unlink } from "fs/promises"
 import { join } from "path"
 import { existsSync } from "fs"
+import { CONTENT_PATHS } from "@/lib/local-content-service"
+import { isDevelopment } from "@/lib/env"
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,59 +15,57 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing slug" }, { status: 400 })
     }
 
-    // Check if we're in development mode
-    const isDevelopment = process.env.NODE_ENV !== 'production'
-    
-    // In development, skip auth checks for easier local development
-    if (!isDevelopment) {
-      const session = await getServerSession(authOptions)
-      
-      if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!isDevelopment()) {
+      await requireAuth()
+    }
+
+    if (!isDevelopment()) {
+      // Try both .md and .mdx extensions
+      const possiblePaths = [
+        `${CONTENT_PATHS.posts}/${slug}.md`,
+        `${CONTENT_PATHS.posts}/${slug}.mdx`,
+      ]
+
+      let deleted = false
+      for (const filePath of possiblePaths) {
+        try {
+          await deleteFile(filePath, `Delete post: ${slug}`)
+          deleted = true
+          break
+        } catch (error) {
+          // Try next path
+        }
       }
 
-      const allowedUsers = process.env.ADMIN_GITHUB_USERNAMES?.split(",").map(u => u.trim()) || []
-      const username = session.user?.name || session.user?.email
-      
-      if (!username || !allowedUsers.includes(username)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
-    } else {
-      // Optional: Log who's making the request in dev
-      const session = await getServerSession(authOptions).catch(() => null)
-      if (session) {
-        console.log(`[DEV] Delete post by: ${session.user?.name || session.user?.email}`)
-      }
-    }
-    
-    if (isDevelopment) {
-      // Delete from local filesystem
-      const appDir = process.cwd()
-      const workspaceRoot = appDir.includes('/apps/admin') 
-        ? join(appDir, '../..') 
-        : appDir
-      const filePath = join(workspaceRoot, `apps/site/src/content/posts/${slug}.md`)
-      
-      // Also try .mdx extension for backwards compatibility
-      const filePathMd = join(workspaceRoot, `apps/site/src/content/posts/${slug}.mdx`)
-      
-      if (existsSync(filePath)) {
-        await unlink(filePath)
-        return NextResponse.json({ success: true, message: "Post deleted" })
-      } else if (existsSync(filePathMd)) {
-        await unlink(filePathMd)
-        return NextResponse.json({ success: true, message: "Post deleted" })
-      } else {
+      if (!deleted) {
         return NextResponse.json({ error: "File not found" }, { status: 404 })
       }
-    } else {
-      // In production, delete via GitHub API
-      // For now, return error
-      return NextResponse.json({ error: "Delete not implemented for production" }, { status: 501 })
+
+      return NextResponse.json({ success: true, message: "Post deleted" })
     }
-  } catch (error) {
+
+    // Development: delete from local filesystem
+    const workspaceRoot = process.cwd().includes('/apps/admin')
+      ? join(process.cwd(), '../..')
+      : process.cwd()
+    
+    const filePath = join(workspaceRoot, `${CONTENT_PATHS.posts}/${slug}.md`)
+    const filePathMd = join(workspaceRoot, `${CONTENT_PATHS.posts}/${slug}.mdx`)
+
+    if (existsSync(filePath)) {
+      await unlink(filePath)
+      return NextResponse.json({ success: true, message: "Post deleted" })
+    } else if (existsSync(filePathMd)) {
+      await unlink(filePathMd)
+      return NextResponse.json({ success: true, message: "Post deleted" })
+    }
+
+    return NextResponse.json({ error: "File not found" }, { status: 404 })
+  } catch (error: any) {
+    if (error.message === 'Unauthorized' || error.message === 'Forbidden') {
+      return NextResponse.json({ error: error.message }, { status: error.message === 'Unauthorized' ? 401 : 403 })
+    }
     console.error("Error deleting post:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
-

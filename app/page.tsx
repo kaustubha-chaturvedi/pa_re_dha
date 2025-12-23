@@ -4,7 +4,7 @@ import { authOptions } from "./api/auth/[...nextauth]/route"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, BookOpen, Settings, Layout, Briefcase, Palette, Image } from "lucide-react"
+import { BookOpen, Settings, Layout, Briefcase, Palette, Image } from "lucide-react"
 
 export default async function Home() {
   const session = await getServerSession(authOptions)

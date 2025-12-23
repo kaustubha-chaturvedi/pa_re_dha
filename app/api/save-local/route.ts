@@ -5,11 +5,12 @@ import { writeFile, mkdir } from "fs/promises"
 import { join } from "path"
 import { existsSync } from "fs"
 
+import { isDevelopment } from "@/lib/env"
+
 export async function POST(req: NextRequest) {
   try {
     // Only allow local saves in development
-    const isDevelopment = process.env.NODE_ENV !== 'production'
-    if (!isDevelopment) {
+    if (!isDevelopment()) {
       return NextResponse.json({ error: "Local saves only allowed in development" }, { status: 403 })
     }
 
