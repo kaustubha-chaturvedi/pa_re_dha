@@ -30,9 +30,12 @@ export function PostsList() {
   const loadPosts = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/list-posts")
+      const res = await fetch("/api/list-posts", {
+        credentials: 'include',
+      })
       if (!res.ok) {
-        throw new Error("Failed to load posts")
+        const errorData = await res.json().catch(() => ({ error: 'Failed to load posts' }))
+        throw new Error(errorData.error || "Failed to load posts")
       }
       const data = await res.json()
       setPosts(data.posts || [])
@@ -40,7 +43,7 @@ export function PostsList() {
       console.error("Error loading posts:", error)
       toast({
         title: "Error",
-        description: "Failed to load posts",
+        description: error instanceof Error ? error.message : "Failed to load posts",
         variant: "destructive",
       })
     } finally {
@@ -63,6 +66,7 @@ export function PostsList() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include',
         body: JSON.stringify({ slug }),
       })
 

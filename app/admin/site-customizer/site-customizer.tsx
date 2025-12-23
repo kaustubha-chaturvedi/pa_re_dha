@@ -126,7 +126,9 @@ export function SiteCustomizer() {
   const loadConfig = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/site-config")
+      const res = await fetch("/api/site-config", {
+        credentials: 'include',
+      })
       if (!res.ok) throw new Error("Failed to load config")
       const data = await res.json()
       // Ensure colors object exists with defaults
@@ -160,6 +162,7 @@ export function SiteCustomizer() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include',
         body: JSON.stringify(config),
       })
 

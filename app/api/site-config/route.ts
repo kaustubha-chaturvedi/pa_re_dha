@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "../auth/[...nextauth]/route"
+import { requireAuth } from "@/lib/auth-service"
 import fs from "fs/promises"
 import path from "path"
 import { isDevelopment } from "@/lib/env"
 
-const SITE_CONFIG_PATH = "apps/site/src/layouts/site-config.json"
+const SITE_CONFIG_PATH = "src/layouts/site-config.json"
 
 // Default config
 const defaultConfig = {
@@ -63,27 +62,17 @@ const defaultConfig = {
 }
 
 export async function GET(req: NextRequest) {
-  // Always require auth in production
-  if (!isDevelopment()) {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-  }
-
   try {
-    // In production, fetch from GitHub
+    // In production, require authentication
     if (!isDevelopment()) {
-      const session = await getServerSession(authOptions)
-      if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-      }
-
-      const allowedUsers = process.env.ADMIN_GITHUB_USERNAMES?.split(",").map(u => u.trim()) || []
-      const username = session.user?.name || session.user?.email
-      
-      if (!username || !allowedUsers.includes(username)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      try {
+        await requireAuth()
+      } catch (authError: any) {
+        console.error('[site-config GET] Authentication error:', authError.message)
+        return NextResponse.json(
+          { error: authError.message || 'Authentication failed' },
+          { status: authError.message === 'Unauthorized' ? 401 : 403 }
+        )
       }
 
       const githubPat = process.env.GITHUB_PAT
@@ -95,36 +84,28 @@ export async function GET(req: NextRequest) {
       const repoName = process.env.GITHUB_REPO_NAME || "shadaj_madhyama_dhaivata"
 
       const encodedPath = SITE_CONFIG_PATH.split('/').map(segment => encodeURIComponent(segment)).join('/')
-      
+      const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${encodedPath}?ref=${encodeURIComponent(process.env.GITHUB_BRANCH || "main")}`
+      console.log('url', url)
       const getFileRes = await fetch(
-        `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${encodedPath}`,
+        url, 
         {
-          headers: {
-            Authorization: `Bearer ${githubPat}`,
-            Accept: "application/vnd.github.v3+json",
-            "User-Agent": "Admin-CMS",
-          },
-        }
-      )
-
+          method: "GET",
+        headers: {
+          Authorization: `Bearer ${githubPat}`,
+          Accept: "application/vnd.github.v3+json",
+          "User-Agent": "Admin-CMS",
+        },
+      })
       if (!getFileRes.ok) {
-        if (getFileRes.status === 404) {
-          return NextResponse.json(defaultConfig)
-        }
-        const error = await getFileRes.text()
-        console.error("GitHub API error:", getFileRes.status, error)
         return NextResponse.json({ error: "Failed to fetch config" }, { status: getFileRes.status })
       }
 
       const fileData = await getFileRes.json()
       const content = Buffer.from(fileData.content, 'base64').toString('utf-8')
       const config = JSON.parse(content)
-      
-      // Ensure colors object exists
       if (!config.colors) {
         config.colors = defaultConfig.colors
       }
-      
       return NextResponse.json(config)
     }
 
@@ -144,23 +125,20 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // Always require auth
-  const session = await getServerSession(authOptions)
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  // In production, require GitHub authentication
-  if (!isDevelopment()) {
-    const allowedUsers = process.env.ADMIN_GITHUB_USERNAMES?.split(",").map(u => u.trim()) || []
-    const username = session.user?.name || session.user?.email
-    
-    if (!username || !allowedUsers.includes(username)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
-  }
-
   try {
+    // Always require auth
+    if (!isDevelopment()) {
+      try {
+        await requireAuth()
+      } catch (authError: any) {
+        console.error('[site-config POST] Authentication error:', authError.message)
+        return NextResponse.json(
+          { error: authError.message || 'Authentication failed' },
+          { status: authError.message === 'Unauthorized' ? 401 : 403 }
+        )
+      }
+    }
+
     const config = await req.json()
     
     // In production, commit to GitHub

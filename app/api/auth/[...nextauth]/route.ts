@@ -23,8 +23,12 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         // Extend session user type
-        const user = session.user as typeof session.user & { id?: string }
+        const user = session.user as typeof session.user & { id?: string; githubUsername?: string }
         user.id = token.sub || ""
+        // Add GitHub username from token
+        if (token.githubUsername) {
+          user.githubUsername = token.githubUsername as string
+        }
         // Add GitHub profile image if available
         if (token.picture) {
           session.user.image = token.picture as string
@@ -33,8 +37,12 @@ export const authOptions: NextAuthOptions = {
       return session
     },
     async jwt({ token, account, profile }) {
+      // Persist the GitHub username to the token
+      const githubProfile = profile as { login?: string; avatar_url?: string } | undefined
+      if (githubProfile?.login) {
+        token.githubUsername = githubProfile.login
+      }
       // Persist the GitHub profile image to the token
-      const githubProfile = profile as { avatar_url?: string } | undefined
       if (githubProfile?.avatar_url) {
         token.picture = githubProfile.avatar_url
       }

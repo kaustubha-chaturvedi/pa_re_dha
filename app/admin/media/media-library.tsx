@@ -48,7 +48,9 @@ export function MediaLibrary() {
   const loadMedia = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/media/list")
+      const res = await fetch("/api/media/list", {
+        credentials: 'include',
+      })
       const data = await res.json()
       
       if (data.configured) {
@@ -105,6 +107,7 @@ export function MediaLibrary() {
 
       const res = await fetch("/api/media/upload", {
         method: "POST",
+        credentials: 'include',
         body: formData,
       })
 
@@ -146,6 +149,7 @@ export function MediaLibrary() {
     try {
       const res = await fetch(`/api/media/delete?key=${encodeURIComponent(key)}`, {
         method: "DELETE",
+        credentials: 'include',
       })
 
       const data = await res.json()

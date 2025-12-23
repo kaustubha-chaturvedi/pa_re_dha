@@ -28,9 +28,12 @@ export function ServicesList() {
   const loadServices = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/list-services")
+      const res = await fetch("/api/list-services", {
+        credentials: 'include',
+      })
       if (!res.ok) {
-        throw new Error("Failed to load services")
+        const errorData = await res.json().catch(() => ({ error: 'Failed to load services' }))
+        throw new Error(errorData.error || "Failed to load services")
       }
       const data = await res.json()
       setServices(data.services || [])
@@ -38,7 +41,7 @@ export function ServicesList() {
       console.error("Error loading services:", error)
       toast({
         title: "Error",
-        description: "Failed to load services",
+        description: error instanceof Error ? error.message : "Failed to load services",
         variant: "destructive",
       })
     } finally {
@@ -61,6 +64,7 @@ export function ServicesList() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include',
         body: JSON.stringify({ slug }),
       })
 

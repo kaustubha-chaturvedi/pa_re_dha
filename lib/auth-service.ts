@@ -5,8 +5,7 @@
 
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../app/api/auth/[...nextauth]/route'
-
-const isDevelopment = process.env.NODE_ENV !== 'production'
+import { isDevelopment } from './env'
 
 /**
  * Check if user is authenticated and authorized
@@ -16,15 +15,33 @@ const isDevelopment = process.env.NODE_ENV !== 'production'
 export async function requireAuth(): Promise<{ session: any; username: string }> {
   const session = await getServerSession(authOptions)
 
-  if (!isDevelopment) {
+  if (!isDevelopment()) {
     if (!session) {
+      console.error('[requireAuth] No session found')
       throw new Error('Unauthorized')
     }
 
     const allowedUsers = process.env.ADMIN_GITHUB_USERNAMES?.split(',').map((u) => u.trim()) || []
-    const username = session.user?.name || session.user?.email || ''
+    // Try to get GitHub username from session (stored during OAuth)
+    const user = session.user as typeof session.user & { githubUsername?: string }
+    const githubUsername = user?.githubUsername
+    // Fallback to name/email if GitHub username not available
+    const username = githubUsername || session.user?.name || session.user?.email || ''
+
+    console.log('[requireAuth] Checking authorization:', {
+      githubUsername,
+      username,
+      allowedUsers,
+      userInList: allowedUsers.includes(username)
+    })
 
     if (!username || !allowedUsers.includes(username)) {
+      console.error('[requireAuth] User not authorized:', {
+        githubUsername,
+        username,
+        allowedUsers,
+        sessionUser: session.user
+      })
       throw new Error('Forbidden')
     }
 

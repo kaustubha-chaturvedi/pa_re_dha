@@ -31,9 +31,12 @@ export function PortfolioList() {
   const loadCaseStudies = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/list-portfolio")
+      const res = await fetch("/api/list-portfolio", {
+        credentials: 'include',
+      })
       if (!res.ok) {
-        throw new Error("Failed to load case studies")
+        const errorData = await res.json().catch(() => ({ error: 'Failed to load case studies' }))
+        throw new Error(errorData.error || "Failed to load case studies")
       }
       const data = await res.json()
       setCaseStudies(data.portfolio || [])
@@ -41,7 +44,7 @@ export function PortfolioList() {
       console.error("Error loading case studies:", error)
       toast({
         title: "Error",
-        description: "Failed to load case studies",
+        description: error instanceof Error ? error.message : "Failed to load case studies",
         variant: "destructive",
       })
     } finally {
@@ -64,6 +67,7 @@ export function PortfolioList() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include',
         body: JSON.stringify({ slug }),
       })
 
